@@ -88,7 +88,33 @@ def build_usdt():
     )
 
     return r.json()
+@app.route("/sign-and-send", methods=["POST"])
+def sign_and_send():
+    try:
+        data = request.json
+        tx = data.get("tx")
 
+        private_key_hex = os.getenv("ADMIN_PRIVATE_KEY")
+        private_key = bytes.fromhex(private_key_hex)
+
+        import ecdsa
+        sk = ecdsa.SigningKey.from_string(private_key, curve=ecdsa.SECP256k1)
+
+        txid = bytes.fromhex(tx["txID"])
+        signature = sk.sign_digest(txid)
+
+        tx["signature"] = [signature.hex()]
+
+        import requests
+        r = requests.post(
+            "https://api.trongrid.io/wallet/broadcasttransaction",
+            json=tx
+        )
+
+        return r.json()
+
+    except Exception as e:
+        return {"error": str(e)}
 # ================== RUN ==================
 
 if __name__ == "__main__":
