@@ -1,54 +1,95 @@
-from flask import Flask, request
+from flask import Flask
 import os
-from tronpy import Tron
-from tronpy.keys import PrivateKey
+import requests
+import ecdsa
+import base58
+import hashlib
 
 app = Flask(__name__)
-client = Tron()
 
-USDT_CONTRACT = "TXLAQ63Xg1NAzckPwKHvzw7CSEmLMEqcdj"
+# ================== BASIC ==================
 
 @app.route('/')
 def home():
     return {"status": "server running"}
 
+@app.route("/check-key")
+def check_key():
+    key = os.getenv("ADMIN_PRIVATE_KEY")
+    return {"status": "key loaded" if key else "no key"}
+
+# ================== WALLET ==================
+
 @app.route("/create-wallet")
 def create_wallet():
-    wallet = client.generate_address()
-    return wallet
+    private_key = os.urandom(32)
 
-@app.route("/send-usdt", methods=["POST"])
-def send_usdt():
-    try:
-        data = request.json
+    sk = ecdsa.SigningKey.from_string(private_key, curve=ecdsa.SECP256k1)
+    vk = sk.verifying_key
+    public_key = b'\x04' + vk.to_string()
 
-        to_address = data.get("to")
-        amount = float(data.get("amount"))
+    sha256 = hashlib.sha256(public_key).digest()
+    ripemd160 = hashlib.new('ripemd160', sha256).digest()
 
-        private_key = os.getenv("ADMIN_PRIVATE_KEY")
-        pk = PrivateKey(bytes.fromhex(private_key))
+    address = b'\x41' + ripemd160
+    checksum = hashlib.sha256(hashlib.sha256(address).digest()).digest()[:4]
+    address_base58 = base58.b58encode(address + checksum)
 
-        owner_address = pk.public_key.to_base58check_address()
+    return {
+        "address": address_base58.decode(),
+        "private_key": private_key.hex()
+    }
 
-        contract = client.get_contract(USDT_CONTRACT)
+# ================== UTILS ==================
 
-        txn = (
-            contract.functions.transfer(
-                to_address,
-                int(amount * 1_000_000)
-            )
-            .with_owner(owner_address)
-            .fee_limit(10_000_000)
-            .build()
-            .sign(pk)
-        )
+def base58_to_hex(address):
+    alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+    num = 0
+    for char in address:
+        num = num * 58 + alphabet.index(char)
 
-        result = txn.broadcast().wait()
+    hex_str = hex(num)[2:]
+    if len(hex_str) % 2:
+        hex_str = '0' + hex_str
 
-        return {"result": result}
+    return hex_str
 
-    except Exception as e:
-        return {"error": str(e)}
+def encode_parameter(to_address, amount):
+    # إزالة 41 prefix
+    to_hex = base58_to_hex(to_address)[2:]
+    to_padded = to_hex.rjust(64, '0')
+    amount_hex = hex(amount)[2:].rjust(64, '0')
+    return to_padded + amount_hex
+
+# ================== BUILD USDT ==================
+
+@app.route("/build-usdt")
+def build_usdt():
+    owner = "TGE4C7ai7i1MbETfKrRC4N7SAJSTppJAcx"
+    to = "TNXsX7LJA521ifTvLxUPTycsiXrChut7zg"
+
+    amount = 1_000_000  # 1 USDT
+
+    parameter = encode_parameter(to, amount)
+
+    payload = {
+        "owner_address": base58_to_hex(owner),
+        "contract_address": "41a614f803b6fd780986a42c78ec9c7f77e6ded13c",
+        "function_selector": "transfer(address,uint256)",
+        "parameter": parameter,
+        "fee_limit": 100000000,
+        "call_value": 0,
+        "visible": False
+    }
+
+    r = requests.post(
+        "https://api.trongrid.io/wallet/triggersmartcontract",
+        json=payload
+    )
+
+    return r.json()
+
+# ================== RUN ==================
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
