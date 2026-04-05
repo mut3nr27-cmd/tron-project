@@ -28,7 +28,10 @@ def register():
 def send_message():
     data = request.json
     msg = data.get("message")
-    return jsonify({"message": f"Sent: {msg}"})
+
+    return jsonify({
+        "message": f"Sent: {msg}"
+    })
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=3000)
