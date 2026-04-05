@@ -10,3 +10,13 @@ def home():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
+import os
+
+@app.route("/check-key")
+def check_key():
+    key = os.getenv("ADMIN_PRIVATE_KEY")
+
+    if key:
+        return {"status": "key loaded"}
+    else:
+        return {"status": "no key"}
