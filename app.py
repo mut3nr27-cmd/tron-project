@@ -40,7 +40,7 @@ def create_wallet():
         "private_key": private_key.hex()
     }
 
-# ================== USDT ==================
+# ================== UTILS ==================
 
 def base58_to_hex(address):
     alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
@@ -55,10 +55,13 @@ def base58_to_hex(address):
     return hex_str
 
 def encode_parameter(to_address, amount):
+    # إزالة 41 prefix
     to_hex = base58_to_hex(to_address)[2:]
     to_padded = to_hex.rjust(64, '0')
     amount_hex = hex(amount)[2:].rjust(64, '0')
     return to_padded + amount_hex
+
+# ================== BUILD USDT ==================
 
 @app.route("/build-usdt")
 def build_usdt():
@@ -70,13 +73,13 @@ def build_usdt():
     parameter = encode_parameter(to, amount)
 
     payload = {
-        "owner_address": owner,
-        "contract_address": "TXLAQ63Xg1NAzckPwKHvzw7CSEmLMEqcdj",
+        "owner_address": base58_to_hex(owner),
+        "contract_address": "41a614f803b6fd780986a42c78ec9c7f77e6ded13c",
         "function_selector": "transfer(address,uint256)",
         "parameter": parameter,
         "fee_limit": 100000000,
         "call_value": 0,
-        "visible": True
+        "visible": False
     }
 
     r = requests.post(
