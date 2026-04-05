@@ -1,20 +1,28 @@
+from flask import Flask
 import os
 import ecdsa
 import base58
 import hashlib
 
-# توليد محفظة
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return {"status": "server running"}
+
+@app.route("/check-key")
+def check_key():
+    key = os.getenv("ADMIN_PRIVATE_KEY")
+    return {"status": "key loaded" if key else "no key"}
+
 @app.route("/create-wallet")
 def create_wallet():
-    # توليد private key
     private_key = os.urandom(32)
 
-    # public key
     sk = ecdsa.SigningKey.from_string(private_key, curve=ecdsa.SECP256k1)
     vk = sk.verifying_key
     public_key = b'\x04' + vk.to_string()
 
-    # hash
     sha256 = hashlib.sha256(public_key).digest()
     ripemd160 = hashlib.new('ripemd160', sha256).digest()
 
