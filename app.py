@@ -115,6 +115,35 @@ def sign_and_send():
 
     except Exception as e:
         return {"error": str(e)}
+        @app.route("/send-now")
+def send_now():
+    try:
+        # نبني الترانزكشن
+        build = requests.get("https://tron-project.onrender.com/build-usdt").json()
+
+        tx = build["result"]["transaction"]
+
+        private_key_hex = os.getenv("ADMIN_PRIVATE_KEY")
+        private_key = bytes.fromhex(private_key_hex)
+
+        import ecdsa
+        sk = ecdsa.SigningKey.from_string(private_key, curve=ecdsa.SECP256k1)
+
+        txid = bytes.fromhex(tx["txID"])
+        signature = sk.sign_digest(txid)
+
+        tx["signature"] = [signature.hex()]
+
+        # إرسال
+        r = requests.post(
+            "https://api.trongrid.io/wallet/broadcasttransaction",
+            json=tx
+        )
+
+        return r.json()
+
+    except Exception as e:
+        return {"error": str(e)}
 # ================== RUN ==================
 
 if __name__ == "__main__":
