@@ -1,5 +1,6 @@
 flask
 gunicorn
+tronpy
 requests
 ecdsa
 base58
