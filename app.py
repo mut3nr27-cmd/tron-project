@@ -183,7 +183,7 @@ def send():
             json=payload
         ).json()
 
-        tx = build["transaction"]
+        tx = build["result"]["transaction"]
 
         sk = ecdsa.SigningKey.from_string(private_key, curve=ecdsa.SECP256k1)
 
