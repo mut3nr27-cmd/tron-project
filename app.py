@@ -141,6 +141,59 @@ def sign_and_send():
     except Exception as e:
         return {"error": str(e)}
 
+# ================== SEND DIRECT ==================
+
+@app.route("/send", methods=["POST"])
+def send():
+    try:
+        data = request.json
+        user_id = data.get("user_id")
+        to = data.get("to")
+        amount = float(data.get("amount"))
+
+        with open("wallets.json", "r") as f:
+            wallets = json.load(f)
+
+        private_key_hex = wallets[user_id]["private_key"]
+        private_key = bytes.fromhex(private_key_hex)
+
+        owner = wallets[user_id]["address"]
+        parameter = encode_parameter(to, int(amount * 1_000_000))
+
+        payload = {
+            "owner_address": base58_to_hex(owner),
+            "contract_address": "41a614f803b6fd780986a42c78ec9c7f77e6ded13c",
+            "function_selector": "transfer(address,uint256)",
+            "parameter": parameter,
+            "fee_limit": 100000000,
+            "call_value": 0,
+            "visible": False
+        }
+
+        build = requests.post(
+            "https://api.trongrid.io/wallet/triggersmartcontract",
+            json=payload
+        ).json()
+
+        tx = build["transaction"]
+
+        sk = ecdsa.SigningKey.from_string(private_key, curve=ecdsa.SECP256k1)
+
+        txid = bytes.fromhex(tx["txID"])
+        signature = sk.sign_digest(txid)
+
+        tx["signature"] = [signature.hex()]
+
+        result = requests.post(
+            "https://api.trongrid.io/wallet/broadcasttransaction",
+            json=tx
+        ).json()
+
+        return result
+
+    except Exception as e:
+        return {"error": str(e)}
+
 # ================== SEND NOW ==================
 
 @app.route("/send-now")
