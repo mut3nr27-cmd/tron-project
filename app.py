@@ -9,7 +9,7 @@ import json
 
 app = Flask(__name__)
 
-# ================== STORAGE FIX ==================
+# ================== STORAGE ==================
 
 def load_wallets():
     if not os.path.exists("wallets.json"):
@@ -29,16 +29,15 @@ def save_wallets(data):
 def home():
     return {"status": "server running"}
 
-@app.route("/check-key")
-def check_key():
-    key = os.getenv("ADMIN_PRIVATE_KEY")
-    return {"status": "key loaded" if key else "no key"}
-
 # ================== WALLET ==================
 
 @app.route("/create-wallet", methods=["POST"])
 def create_wallet():
     data = request.json
+
+    if not data or "user_id" not in data:
+        return {"error": "user_id required"}
+
     user_id = data.get("user_id")
 
     private_key = os.urandom(32)
@@ -59,9 +58,9 @@ def create_wallet():
         "private_key": private_key.hex()
     }
 
-    all_wallets = load_wallets()
-    all_wallets[user_id] = wallet_data
-    save_wallets(all_wallets)
+    wallets = load_wallets()
+    wallets[user_id] = wallet_data
+    save_wallets(wallets)
 
     return {
         "user_id": user_id,
@@ -75,6 +74,8 @@ def base58_to_hex(address):
     alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
     num = 0
     for char in address:
+        if char not in alphabet:
+            raise ValueError("Invalid address")
         num = num * 58 + alphabet.index(char)
 
     hex_str = hex(num)[2:]
@@ -89,83 +90,36 @@ def encode_parameter(to_address, amount):
     amount_hex = hex(amount)[2:].rjust(64, '0')
     return to_padded + amount_hex
 
-# ================== BUILD USDT ==================
-
-@app.route("/build-usdt")
-def build_usdt():
-    owner = "TGE4C7ai7i1MbETfKrRC4N7SAJSTppJAcx"
-    to = "TNXsX7LJA521ifTvLxUPTycsiXrChut7zg"
-
-    amount = 1_000_000
-
-    parameter = encode_parameter(to, amount)
-
-    payload = {
-        "owner_address": base58_to_hex(owner),
-        "contract_address": "41a614f803b6fd780986a42c78ec9c7f77e6ded13c",
-        "function_selector": "transfer(address,uint256)",
-        "parameter": parameter,
-        "fee_limit": 100000000,
-        "call_value": 0,
-        "visible": False
-    }
-
-    r = requests.post(
-        "https://api.trongrid.io/wallet/triggersmartcontract",
-        json=payload
-    )
-
-    return r.json()
-
-# ================== SIGN (USER BASED) ==================
-
-@app.route("/sign-and-send", methods=["POST"])
-def sign_and_send():
-    try:
-        data = request.json
-        tx = data.get("tx")
-        user_id = data.get("user_id")
-
-        wallets = load_wallets()
-
-        private_key_hex = wallets[user_id]["private_key"]
-        private_key = bytes.fromhex(private_key_hex)
-
-        sk = ecdsa.SigningKey.from_string(private_key, curve=ecdsa.SECP256k1)
-
-        raw_data = bytes.fromhex(tx["raw_data_hex"])
-        hash_data = hashlib.sha256(raw_data).digest()
-
-        signature = sk.sign_digest(hash_data, sigencode=ecdsa.util.sigencode_string) + b'\x01'
-
-        tx["signature"] = [signature.hex()]
-
-        r = requests.post(
-            "https://api.trongrid.io/wallet/broadcasttransaction",
-            json=tx
-        )
-
-        return r.json()
-
-    except Exception as e:
-        return {"error": str(e)}
-
-# ================== SEND DIRECT ==================
+# ================== SEND ==================
 
 @app.route("/send", methods=["POST"])
 def send():
     try:
         data = request.json
+
+        # تحقق من البيانات
+        if not data:
+            return {"error": "no data"}
+
         user_id = data.get("user_id")
         to = data.get("to")
-        amount = float(data.get("amount"))
+        amount = data.get("amount")
+
+        if not user_id or not to or not amount:
+            return {"error": "missing fields"}
+
+        amount = float(amount)
 
         wallets = load_wallets()
+
+        if user_id not in wallets:
+            return {"error": "user not found"}
 
         private_key_hex = wallets[user_id]["private_key"]
         private_key = bytes.fromhex(private_key_hex)
 
         owner = wallets[user_id]["address"]
+
         parameter = encode_parameter(to, int(amount * 1_000_000))
 
         payload = {
@@ -183,6 +137,10 @@ def send():
             json=payload
         ).json()
 
+        # ✅ تحقق من وجود transaction
+        if "result" not in build or "transaction" not in build["result"]:
+            return {"error": build}
+
         tx = build["result"]["transaction"]
 
         sk = ecdsa.SigningKey.from_string(private_key, curve=ecdsa.SECP256k1)
@@ -190,7 +148,10 @@ def send():
         raw_data = bytes.fromhex(tx["raw_data_hex"])
         hash_data = hashlib.sha256(raw_data).digest()
 
-        signature = sk.sign_digest(hash_data, sigencode=ecdsa.util.sigencode_string) + b'\x01'
+        signature = sk.sign_digest(
+            hash_data,
+            sigencode=ecdsa.util.sigencode_string
+        ) + b'\x01'
 
         tx["signature"] = [signature.hex()]
 
@@ -204,7 +165,7 @@ def send():
     except Exception as e:
         return {"error": str(e)}
 
-# ================== GET BALANCE ==================
+# ================== BALANCE ==================
 
 @app.route("/get-balance")
 def get_balance():
@@ -234,37 +195,6 @@ def get_balance():
             "address": address,
             "usdt_balance": balance
         }
-
-    except Exception as e:
-        return {"error": str(e)}
-
-# ================== SEND NOW ==================
-
-@app.route("/send-now")
-def send_now():
-    try:
-        build = requests.get("https://tron-project.onrender.com/build-usdt").json()
-
-        tx = build["result"]["transaction"]
-
-        private_key_hex = os.getenv("ADMIN_PRIVATE_KEY")
-        private_key = bytes.fromhex(private_key_hex)
-
-        sk = ecdsa.SigningKey.from_string(private_key, curve=ecdsa.SECP256k1)
-
-        raw_data = bytes.fromhex(tx["raw_data_hex"])
-        hash_data = hashlib.sha256(raw_data).digest()
-
-        signature = sk.sign_digest(hash_data, sigencode=ecdsa.util.sigencode_string) + b'\x01'
-
-        tx["signature"] = [signature.hex()]
-
-        r = requests.post(
-            "https://api.trongrid.io/wallet/broadcasttransaction",
-            json=tx
-        )
-
-        return r.json()
 
     except Exception as e:
         return {"error": str(e)}
