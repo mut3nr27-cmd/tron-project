@@ -37,7 +37,7 @@ def create_wallet():
 
     return {
         "address": address_base58.decode(),
-        "private_key": private_key.hex()
+        "private_key": "hidden"
     }
 
 # ================== UTILS ==================
@@ -88,8 +88,6 @@ def build_usdt():
 
     return r.json()
 
-# ================== SIGN ==================
-
 @app.route("/sign-and-send", methods=["POST"])
 def sign_and_send():
     try:
@@ -115,8 +113,6 @@ def sign_and_send():
 
     except Exception as e:
         return {"error": str(e)}
-
-# ================== SEND NOW ==================
 
 @app.route("/send-now")
 def send_now():
