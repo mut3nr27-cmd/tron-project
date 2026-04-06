@@ -20,8 +20,11 @@ def check_key():
 
 # ================== WALLET ==================
 
-@app.route("/create-wallet")
+@app.route("/create-wallet", methods=["POST"])
 def create_wallet():
+    data = request.json
+    user_id = data.get("user_id")
+
     private_key = os.urandom(32)
 
     sk = ecdsa.SigningKey.from_string(private_key, curve=ecdsa.SECP256k1)
@@ -35,7 +38,12 @@ def create_wallet():
     checksum = hashlib.sha256(hashlib.sha256(address).digest()).digest()[:4]
     address_base58 = base58.b58encode(address + checksum)
 
+    print("USER:", user_id)
+    print("ADDRESS:", address_base58.decode())
+    print("PRIVATE:", private_key.hex())
+
     return {
+        "user_id": user_id,
         "address": address_base58.decode(),
         "private_key": "hidden"
     }
