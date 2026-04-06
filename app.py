@@ -133,8 +133,10 @@ def sign_and_send():
 
         sk = ecdsa.SigningKey.from_string(private_key, curve=ecdsa.SECP256k1)
 
-        txid = bytes.fromhex(tx["txID"])
-        signature = sk.sign_digest(txid, sigencode=ecdsa.util.sigencode_string) + b'\x01'
+        raw_data = bytes.fromhex(tx["raw_data_hex"])
+        hash_data = hashlib.sha256(raw_data).digest()
+
+        signature = sk.sign_digest(hash_data, sigencode=ecdsa.util.sigencode_string) + b'\x01'
 
         tx["signature"] = [signature.hex()]
 
@@ -185,8 +187,10 @@ def send():
 
         sk = ecdsa.SigningKey.from_string(private_key, curve=ecdsa.SECP256k1)
 
-        txid = bytes.fromhex(tx["txID"])
-        signature = sk.sign_digest(txid, sigencode=ecdsa.util.sigencode_string) + b'\x01'
+        raw_data = bytes.fromhex(tx["raw_data_hex"])
+        hash_data = hashlib.sha256(raw_data).digest()
+
+        signature = sk.sign_digest(hash_data, sigencode=ecdsa.util.sigencode_string) + b'\x01'
 
         tx["signature"] = [signature.hex()]
 
@@ -248,8 +252,10 @@ def send_now():
 
         sk = ecdsa.SigningKey.from_string(private_key, curve=ecdsa.SECP256k1)
 
-        txid = bytes.fromhex(tx["txID"])
-        signature = sk.sign_digest(txid, sigencode=ecdsa.util.sigencode_string) + b'\x01'
+        raw_data = bytes.fromhex(tx["raw_data_hex"])
+        hash_data = hashlib.sha256(raw_data).digest()
+
+        signature = sk.sign_digest(hash_data, sigencode=ecdsa.util.sigencode_string) + b'\x01'
 
         tx["signature"] = [signature.hex()]
 
