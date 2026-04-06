@@ -3,3 +3,4 @@ gunicorn
 ecdsa
 base58
 requests
+cryptography
