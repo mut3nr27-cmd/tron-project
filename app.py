@@ -201,8 +201,14 @@ def get_balance():
     try:
         user_id = request.args.get("user_id")
 
-        with open("wallets.json", "r") as f:
-            wallets = json.load(f)
+        try:
+            with open("wallets.json", "r") as f:
+                wallets = json.load(f)
+        except:
+            return {"error": "no wallets yet"}
+
+        if user_id not in wallets:
+            return {"error": "user not found"}
 
         address = wallets[user_id]["address"]
 
