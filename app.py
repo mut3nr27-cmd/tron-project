@@ -97,7 +97,6 @@ def send():
     try:
         data = request.json
 
-        # تحقق من البيانات
         if not data:
             return {"error": "no data"}
 
@@ -134,12 +133,13 @@ def send():
 
         build = requests.post(
             "https://api.trongrid.io/wallet/triggersmartcontract",
-            json=payload
+            json=payload,
+            timeout=10
         ).json()
 
-        # ✅ تحقق من وجود transaction
+        # ✅ عرض الخطأ الحقيقي مباشرة
         if "result" not in build or "transaction" not in build["result"]:
-            return {"error": build}
+            return build
 
         tx = build["result"]["transaction"]
 
@@ -157,7 +157,8 @@ def send():
 
         result = requests.post(
             "https://api.trongrid.io/wallet/broadcasttransaction",
-            json=tx
+            json=tx,
+            timeout=10
         ).json()
 
         return result
@@ -179,8 +180,10 @@ def get_balance():
 
         address = wallets[user_id]["address"]
 
-        url = f"https://api.trongrid.io/v1/accounts/{address}"
-        r = requests.get(url).json()
+        r = requests.get(
+            f"https://api.trongrid.io/v1/accounts/{address}",
+            timeout=10
+        ).json()
 
         balance = 0
 
