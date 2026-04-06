@@ -39,7 +39,6 @@ def create_wallet():
     checksum = hashlib.sha256(hashlib.sha256(address).digest()).digest()[:4]
     address_base58 = base58.b58encode(address + checksum)
 
-    # 💾 تخزين المحفظة
     wallet_data = {
         "address": address_base58.decode(),
         "private_key": private_key.hex()
@@ -110,13 +109,19 @@ def build_usdt():
 
     return r.json()
 
+# ================== SIGN (USER BASED) ==================
+
 @app.route("/sign-and-send", methods=["POST"])
 def sign_and_send():
     try:
         data = request.json
         tx = data.get("tx")
+        user_id = data.get("user_id")
 
-        private_key_hex = os.getenv("ADMIN_PRIVATE_KEY")
+        with open("wallets.json", "r") as f:
+            wallets = json.load(f)
+
+        private_key_hex = wallets[user_id]["private_key"]
         private_key = bytes.fromhex(private_key_hex)
 
         sk = ecdsa.SigningKey.from_string(private_key, curve=ecdsa.SECP256k1)
@@ -135,6 +140,8 @@ def sign_and_send():
 
     except Exception as e:
         return {"error": str(e)}
+
+# ================== SEND NOW ==================
 
 @app.route("/send-now")
 def send_now():
