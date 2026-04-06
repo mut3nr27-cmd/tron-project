@@ -194,6 +194,38 @@ def send():
     except Exception as e:
         return {"error": str(e)}
 
+# ================== GET BALANCE ==================
+
+@app.route("/get-balance")
+def get_balance():
+    try:
+        user_id = request.args.get("user_id")
+
+        with open("wallets.json", "r") as f:
+            wallets = json.load(f)
+
+        address = wallets[user_id]["address"]
+
+        url = f"https://api.trongrid.io/v1/accounts/{address}"
+        r = requests.get(url).json()
+
+        balance = 0
+
+        if "data" in r and len(r["data"]) > 0:
+            tokens = r["data"][0].get("trc20", [])
+            for t in tokens:
+                if "TXLAQ63Xg1NAzckPwKHvzw7CSEmLMEqcdj" in t:
+                    balance = int(t["TXLAQ63Xg1NAzckPwKHvzw7CSEmLMEqcdj"]) / 1_000_000
+
+        return {
+            "user_id": user_id,
+            "address": address,
+            "usdt_balance": balance
+        }
+
+    except Exception as e:
+        return {"error": str(e)}
+
 # ================== SEND NOW ==================
 
 @app.route("/send-now")
