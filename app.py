@@ -8,6 +8,20 @@ import json
 
 app = Flask(__name__)
 
+# ================== STORAGE FIX ==================
+
+def load_wallets():
+    if not os.path.exists("wallets.json"):
+        with open("wallets.json", "w") as f:
+            json.dump({}, f)
+
+    with open("wallets.json", "r") as f:
+        return json.load(f)
+
+def save_wallets(data):
+    with open("wallets.json", "w") as f:
+        json.dump(data, f)
+
 # ================== BASIC ==================
 
 @app.route('/')
@@ -44,16 +58,9 @@ def create_wallet():
         "private_key": private_key.hex()
     }
 
-    try:
-        with open("wallets.json", "r") as f:
-            all_wallets = json.load(f)
-    except:
-        all_wallets = {}
-
+    all_wallets = load_wallets()
     all_wallets[user_id] = wallet_data
-
-    with open("wallets.json", "w") as f:
-        json.dump(all_wallets, f)
+    save_wallets(all_wallets)
 
     return {
         "user_id": user_id,
@@ -118,8 +125,7 @@ def sign_and_send():
         tx = data.get("tx")
         user_id = data.get("user_id")
 
-        with open("wallets.json", "r") as f:
-            wallets = json.load(f)
+        wallets = load_wallets()
 
         private_key_hex = wallets[user_id]["private_key"]
         private_key = bytes.fromhex(private_key_hex)
@@ -151,8 +157,7 @@ def send():
         to = data.get("to")
         amount = float(data.get("amount"))
 
-        with open("wallets.json", "r") as f:
-            wallets = json.load(f)
+        wallets = load_wallets()
 
         private_key_hex = wallets[user_id]["private_key"]
         private_key = bytes.fromhex(private_key_hex)
@@ -201,11 +206,7 @@ def get_balance():
     try:
         user_id = request.args.get("user_id")
 
-        try:
-            with open("wallets.json", "r") as f:
-                wallets = json.load(f)
-        except:
-            return {"error": "no wallets yet"}
+        wallets = load_wallets()
 
         if user_id not in wallets:
             return {"error": "user not found"}
