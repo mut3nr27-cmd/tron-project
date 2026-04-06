@@ -4,6 +4,7 @@ import requests
 import ecdsa
 import base58
 import hashlib
+import json
 
 app = Flask(__name__)
 
@@ -38,13 +39,26 @@ def create_wallet():
     checksum = hashlib.sha256(hashlib.sha256(address).digest()).digest()[:4]
     address_base58 = base58.b58encode(address + checksum)
 
-    print("USER:", user_id)
-    print("ADDRESS:", address_base58.decode())
-    print("PRIVATE:", private_key.hex())
+    # 💾 تخزين المحفظة
+    wallet_data = {
+        "address": address_base58.decode(),
+        "private_key": private_key.hex()
+    }
+
+    try:
+        with open("wallets.json", "r") as f:
+            all_wallets = json.load(f)
+    except:
+        all_wallets = {}
+
+    all_wallets[user_id] = wallet_data
+
+    with open("wallets.json", "w") as f:
+        json.dump(all_wallets, f)
 
     return {
         "user_id": user_id,
-        "address": address_base58.decode(),
+        "address": wallet_data["address"],
         "private_key": "hidden"
     }
 
